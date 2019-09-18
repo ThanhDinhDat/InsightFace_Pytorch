@@ -1,0 +1,4 @@
+*.JPG
+__pycache__
+data/*
+*.pth

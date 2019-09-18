@@ -14,6 +14,7 @@ from torchvision import transforms as trans
 import math
 import bcolz
 
+
 class face_learner(object):
     def __init__(self, conf, inference=False):
         print(conf)
@@ -21,8 +22,10 @@ class face_learner(object):
             self.model = MobileFaceNet(conf.embedding_size).to(conf.device)
             print('MobileFaceNet model generated')
         else:
+          
             self.model = Backbone(conf.net_depth, conf.drop_ratio, conf.net_mode).to(conf.device)
             print('{}_{} model generated'.format(conf.net_mode, conf.net_depth))
+            
         
         if not inference:
             self.milestones = conf.milestones
@@ -52,8 +55,10 @@ class face_learner(object):
 
             print('optimizers generated')    
             self.board_loss_every = len(self.loader)//100
-            self.evaluate_every = len(self.loader)//10
-            self.save_every = len(self.loader)//5
+            self.evaluate_every = len(self.loader)
+            # self.evaluate_every = len(self.loader)//10
+            self.save_every = len(self.loader)
+            # self.save_every = len(self.loader)//5
             self.agedb_30, self.cfp_fp, self.lfw, self.agedb_30_issame, self.cfp_fp_issame, self.lfw_issame = get_val_data(self.loader.dataset.root.parent)
         else:
             self.threshold = conf.threshold
@@ -74,12 +79,17 @@ class face_learner(object):
                 self.optimizer.state_dict(), save_path /
                 ('optimizer_{}_accuracy:{}_step:{}_{}.pth'.format(get_time(), accuracy, self.step, extra)))
     
-    def load_state(self, conf, fixed_str, from_save_folder=False, model_only=False):
-        if from_save_folder:
+    def load_state(self, conf, fixed_str, from_save_folder=False, model_only=False, weight=None):
+        if weight:
+            save_path = weight
+        elif from_save_folder:
             save_path = conf.save_path
         else:
-            save_path = conf.model_path            
-        self.model.load_state_dict(torch.load(save_path/'model_{}'.format(fixed_str)))
+            save_path = conf.model_path
+        if weight:
+            self.model.load_state_dict(torch.load(save_path))
+        else:
+            self.model.load_state_dict(torch.load(save_path/'model_{}'.format(fixed_str)))
         if not model_only:
             self.head.load_state_dict(torch.load(save_path/'head_{}'.format(fixed_str)))
             self.optimizer.load_state_dict(torch.load(save_path/'optimizer_{}'.format(fixed_str)))
@@ -242,12 +252,21 @@ class face_learner(object):
                 emb = self.model(conf.test_transform(img).to(conf.device).unsqueeze(0))
                 emb_mirror = self.model(conf.test_transform(mirror).to(conf.device).unsqueeze(0))
                 embs.append(l2_norm(emb + emb_mirror))
+
             else:                        
                 embs.append(self.model(conf.test_transform(img).to(conf.device).unsqueeze(0)))
         source_embs = torch.cat(embs)
         
         diff = source_embs.unsqueeze(-1) - target_embs.transpose(1,0).unsqueeze(0)
         dist = torch.sum(torch.pow(diff, 2), dim=1)
+        print(dist)
         minimum, min_idx = torch.min(dist, dim=1)
-        min_idx[minimum > self.threshold] = -1 # if no match, set idx to -1
+        # print(minimum)
+        print('Euclidean dist: {}'.format(min_idx))
+        sims = np.dot(source_embs.detach().cpu().numpy(), target_embs.detach().cpu().numpy().T)
+        print(sims)
+        minimum = sims
+        min_idx = [np.where(sim == np.amax(sim))[0][0] for sim in sims]
+        print('Similarity dist: {}'.format(min_idx))
+        # min_idx[minimum > self.threshold] = -1 # if no match, set idx to -1
         return min_idx, minimum               

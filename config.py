@@ -13,9 +13,12 @@ def get_config(training = True):
     conf.save_path = conf.work_path/'save'
     conf.input_size = [112,112]
     conf.embedding_size = 512
+    # conf.use_mobilfacenet = True
     conf.use_mobilfacenet = False
-    conf.net_depth = 50
+    # conf.net_depth = 50
+    conf.net_depth = 100
     conf.drop_ratio = 0.6
+    # conf.net_mode = 'ir_se' # or 'ir'
     conf.net_mode = 'ir_se' # or 'ir'
     conf.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     conf.test_transform = trans.Compose([
@@ -43,9 +46,9 @@ def get_config(training = True):
 #--------------------Inference Config ------------------------
     else:
         conf.facebank_path = conf.data_path/'facebank'
-        conf.threshold = 1.5
+        conf.threshold = 1
         conf.face_limit = 10 
         #when inference, at maximum detect 10 faces in one image, my laptop is slow
-        conf.min_face_size = 30 
+        conf.min_face_size = 50 
         # the larger this value, the faster deduction, comes with tradeoff in small faces
     return conf

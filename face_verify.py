@@ -28,8 +28,8 @@ if __name__ == '__main__':
     if conf.device.type == 'cpu':
         learner.load_state(conf, 'cpu_final.pth', True, True)
     else:
-        learner.load_state(conf, 'final.pth', True, True)
-    learner.model.eval()
+        # learner.load_state(conf, 'mobilefacenet.pth', True, True)
+        learner.load_state(conf, 'ir_se50.pth', True, True)
     print('learner loaded')
     
     if args.update:

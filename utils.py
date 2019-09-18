@@ -11,6 +11,11 @@ from model import l2_norm
 import pdb
 import cv2
 
+
+from face_detection.accuracy_evaluation import predict
+from face_detection.config_farm import configuration_10_320_20L_5scales_v2 as cfg
+import mxnet as mx
+import numpy as np
 def separate_bn_paras(modules):
     if not isinstance(modules, list):
         modules = [*modules.modules()]
@@ -30,6 +35,19 @@ def separate_bn_paras(modules):
 
 def prepare_facebank(conf, model, mtcnn, tta = True):
     model.eval()
+    ctx = mx.gpu(0)
+    symbol_file_path = 'face_detection/symbol_farm/symbol_10_320_20L_5scales_v2_deploy.json'
+    model_file_path = 'face_detection/saved_model/configuration_10_320_20L_5scales_v2/train_10_320_20L_5scales_v2_iter_1800000.params'
+    face_detector = predict.Predict(mxnet=mx,
+                             symbol_file_path=symbol_file_path,
+                             model_file_path=model_file_path,
+                             ctx=ctx,
+                             receptive_field_list=cfg.param_receptive_field_list,
+                             receptive_field_stride=cfg.param_receptive_field_stride,
+                             bbox_small_list=cfg.param_bbox_small_list,
+                             bbox_large_list=cfg.param_bbox_large_list,
+                             receptive_field_center_start=cfg.param_receptive_field_center_start,
+                             num_output_scales=cfg.param_num_output_scales)
     embeddings =  []
     names = ['Unknown']
     for path in conf.facebank_path.iterdir():
@@ -37,22 +55,66 @@ def prepare_facebank(conf, model, mtcnn, tta = True):
             continue
         else:
             embs = []
-            for file in path.iterdir():
-                if not file.is_file():
+            for filename in path.iterdir():
+                if not filename.is_file():
                     continue
                 else:
                     try:
-                        img = Image.open(file)
-                    except:
+                        print(filename)
+                        image = Image.open(filename)
+                        img = image
+                        # img = np.array(image) 
+                        # img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+
+                        # faces, infer_time = face_detector.predict(img, resize_scale=0.5, score_threshold=0.4, top_k=10000, \
+                        #                     NMS_threshold=0.2, NMS_flag=True, skip_scale_branch_list=[])
+                        # img_size = 112
+                        # print(len(faces))
+                        # margin = 0
+                       
+                        # img_h, img_w, _ = np.shape(image)
+                        
+                        # for i, bbox in enumerate(faces):
+                        #     x1, y1, x2, y2= bbox[0], bbox[1], bbox[2] ,bbox[3]
+                        #     xw1 = max(int(x1 - margin ), 0)
+                        #     yw1 = max(int(y1 - margin ), 0)
+                        #     xw2 = min(int(x2 + margin ), img_w - 1)
+                        #     yw2 = min(int(y2 + margin ), img_h - 1)
+                        #     face =  cv2.resize(img[yw1:yw2 + 1, xw1:xw2 + 1], (img_size, img_size))
+                        #     # img = Image.fromarray(face[...,::-1])
+                        #     img = face 
+                        #     break
+                    except Exception  as e:
+                        print(e)
                         continue
+                    
+
                     if img.size != (112, 112):
                         img = mtcnn.align(img)
+                    print(type(img))
+                    # cv2.imshow('window', img)
+                    # img.show()
+                    # if cv2.waitKey() == ord('q'):
+                        # break
                     with torch.no_grad():
                         if tta:
+                            img = trans.functional.to_grayscale(img, num_output_channels=3)
                             mirror = trans.functional.hflip(img)
                             emb = model(conf.test_transform(img).to(conf.device).unsqueeze(0))
                             emb_mirror = model(conf.test_transform(mirror).to(conf.device).unsqueeze(0))
+
+                            v_mirror = trans.functional.vflip(mirror)
+                            v_emb_mirror = model(conf.test_transform(v_mirror).to(conf.device).unsqueeze(0))
+
+                            v_img = trans.functional.vflip(img)
+                            v_img_mirror = model(conf.test_transform(v_img).to(conf.device).unsqueeze(0))
+
                             embs.append(l2_norm(emb + emb_mirror))
+                            # embs.append(l2_norm(emb + emb_mirror + v_emb_mirror + v_img_mirror))
+                            # embs.append(emb)
+                            # embs.append(emb_mirror)
+                            # embs.append(v_emb_mirror)
+                            # embs.append(v_img_mirror)
                         else:                        
                             embs.append(model(conf.test_transform(img).to(conf.device).unsqueeze(0)))
         if len(embs) == 0:

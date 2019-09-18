@@ -13,6 +13,8 @@ if __name__ == '__main__':
     parser.add_argument("-b", "--batch_size", help="batch_size", default=96, type=int)
     parser.add_argument("-w", "--num_workers", help="workers number", default=3, type=int)
     parser.add_argument("-d", "--data_mode", help="use which database, [vgg, ms1m, emore, concat]",default='emore', type=str)
+    parser.add_argument("--weight", help="resume from weight",default='', type=str)
+    
     args = parser.parse_args()
 
     conf = get_config()
@@ -28,5 +30,7 @@ if __name__ == '__main__':
     conf.num_workers = args.num_workers
     conf.data_mode = args.data_mode
     learner = face_learner(conf)
-
+    if args.weight:
+        learner.load_state(conf, 'ir_se50.pth', True, True, weight=args.weight)
+        print('Loaded weight from: {}'.format(args.weight))
     learner.train(conf, args.epochs)

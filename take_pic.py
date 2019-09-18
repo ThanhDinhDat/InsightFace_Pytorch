@@ -11,6 +11,7 @@ from mtcnn_pytorch.src.align_trans import get_reference_facial_points, warp_and_
 
 parser = argparse.ArgumentParser(description='take a picture')
 parser.add_argument('--name','-n', default='unknown', type=str,help='input the name of the recording person')
+parser.add_argument('--extension', default='.jpg', type=str, help='image extension')
 args = parser.parse_args()
 from pathlib import Path
 data_path = Path('data')
@@ -44,7 +45,7 @@ while cap.isOpened():
         p =  Image.fromarray(frame[...,::-1])
         try:            
             warped_face = np.array(mtcnn.align(p))[...,::-1]
-            cv2.imwrite(str(save_path/'{}.jpg'.format(str(datetime.now())[:-7].replace(":","-").replace(" ","-"))), warped_face)
+            cv2.imwrite(str(save_path/'{}{}'.format(str(datetime.now())[:-7].replace(":","-").replace(" ","-"), args.extension)), warped_face)
         except:
             print('no face captured')
         
